@@ -12,6 +12,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // Clear loading message
       activitiesList.innerHTML = "";
+      // Reset activity select so we don't duplicate options on refresh
+      activitySelect.innerHTML = '<option value="">-- Select an activity --</option>';
 
       // Populate activities list
       Object.entries(activities).forEach(([name, details]) => {
@@ -20,12 +22,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
-        // Reemplazamos el innerHTML por construcción DOM para la sección de participantes
+        // Build inner HTML and include an availability span we can update later
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
-          <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
+          <p><strong>Availability:</strong> <span class="availability">${spotsLeft}</span> spots left</p>
         `;
 
         // Participants header
@@ -33,18 +35,9 @@ document.addEventListener("DOMContentLoaded", () => {
         participantsHeader.textContent = "Participants:";
         activityCard.appendChild(participantsHeader);
 
-        // Participants list
+        // Participants list (bulleted)
         const participantsList = document.createElement("ul");
         participantsList.className = "participants-list";
-
-        // Helper: obtener iniciales
-        function getInitials(fullName) {
-          return fullName
-            .split(" ")
-            .map(part => part[0]?.toUpperCase() || "")
-            .slice(0, 2)
-            .join("");
-        }
 
         if (!details.participants || details.participants.length === 0) {
           const li = document.createElement("li");
@@ -57,16 +50,46 @@ document.addEventListener("DOMContentLoaded", () => {
             const li = document.createElement("li");
             li.className = "participant-item";
 
-            const avatar = document.createElement("span");
-            avatar.className = "avatar";
-            avatar.textContent = getInitials(participant);
-
             const nameSpan = document.createElement("span");
             nameSpan.className = "participant-name";
             nameSpan.textContent = participant;
 
-            li.appendChild(avatar);
+            const removeBtn = document.createElement("button");
+            removeBtn.className = "remove-participant-btn";
+            removeBtn.setAttribute("aria-label", `Remove ${participant}`);
+            removeBtn.type = "button";
+            removeBtn.textContent = "✖";
+
+            // Attach unregister action
+            removeBtn.addEventListener("click", async (e) => {
+              e.stopPropagation();
+              try {
+                const res = await fetch(
+                  `/activities/${encodeURIComponent(name)}/unregister?email=${encodeURIComponent(participant)}`,
+                  { method: "POST" }
+                );
+
+                const result = await res.json();
+                if (res.ok) {
+                  // remove from DOM
+                  li.remove();
+
+                  // update availability number
+                  const avail = activityCard.querySelector(".availability");
+                  if (avail) {
+                    const current = parseInt(avail.textContent || "0", 10);
+                    avail.textContent = String(current + 1);
+                  }
+                } else {
+                  console.error("Failed to unregister:", result.detail || result);
+                }
+              } catch (err) {
+                console.error("Error unregistering participant:", err);
+              }
+            });
+
             li.appendChild(nameSpan);
+            li.appendChild(removeBtn);
             participantsList.appendChild(li);
           });
 
@@ -114,6 +137,8 @@ document.addEventListener("DOMContentLoaded", () => {
         messageDiv.textContent = result.message;
         messageDiv.className = "success";
         signupForm.reset();
+        // Refresh activities view so new participant appears immediately
+        await fetchActivities();
       } else {
         messageDiv.textContent = result.detail || "An error occurred";
         messageDiv.className = "error";
