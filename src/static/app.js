@@ -20,17 +20,65 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const spotsLeft = details.max_participants - details.participants.length;
 
+        // Reemplazamos el innerHTML por construcción DOM para la sección de participantes
         activityCard.innerHTML = `
           <h4>${name}</h4>
           <p>${details.description}</p>
           <p><strong>Schedule:</strong> ${details.schedule}</p>
           <p><strong>Availability:</strong> ${spotsLeft} spots left</p>
-          <h5>Participants:</h5>
-          <ul>
-            ${details.participants.map(participant => `<li>${participant}</li>`).join('')}
-          </ul>
         `;
 
+        // Participants header
+        const participantsHeader = document.createElement("h5");
+        participantsHeader.textContent = "Participants:";
+        activityCard.appendChild(participantsHeader);
+
+        // Participants list
+        const participantsList = document.createElement("ul");
+        participantsList.className = "participants-list";
+
+        // Helper: obtener iniciales
+        function getInitials(fullName) {
+          return fullName
+            .split(" ")
+            .map(part => part[0]?.toUpperCase() || "")
+            .slice(0, 2)
+            .join("");
+        }
+
+        if (!details.participants || details.participants.length === 0) {
+          const li = document.createElement("li");
+          li.className = "no-participants";
+          li.textContent = "No participants yet.";
+          participantsList.appendChild(li);
+        } else {
+          const maxShow = 5;
+          details.participants.slice(0, maxShow).forEach(participant => {
+            const li = document.createElement("li");
+            li.className = "participant-item";
+
+            const avatar = document.createElement("span");
+            avatar.className = "avatar";
+            avatar.textContent = getInitials(participant);
+
+            const nameSpan = document.createElement("span");
+            nameSpan.className = "participant-name";
+            nameSpan.textContent = participant;
+
+            li.appendChild(avatar);
+            li.appendChild(nameSpan);
+            participantsList.appendChild(li);
+          });
+
+          if (details.participants.length > maxShow) {
+            const moreLi = document.createElement("li");
+            moreLi.className = "participant-more";
+            moreLi.textContent = `and ${details.participants.length - maxShow} more...`;
+            participantsList.appendChild(moreLi);
+          }
+        }
+
+        activityCard.appendChild(participantsList);
         activitiesList.appendChild(activityCard);
 
         // Add option to select dropdown
